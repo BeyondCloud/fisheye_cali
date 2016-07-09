@@ -24,6 +24,18 @@ using namespace cv;
 
 #define pi 3.1415926
 
+void MyFilledCircle( Mat img, Point center,double w )
+{
+ int thickness = -1;
+ int lineType = 8;
+
+ circle( img,
+         center,
+         w/2,
+         Scalar( 0, 255, 0 ),
+         thickness,
+         lineType );
+}
 int main()
 {
     Mat Img;
@@ -36,11 +48,11 @@ int main()
     }
 
     Mat Img_out = imread("image.png",CV_LOAD_IMAGE_COLOR);;
-    Img_out = Scalar(0,0,0);
+    Mat test = imread("image.png",CV_LOAD_IMAGE_COLOR);;
+    Img_out = Scalar(0,0,255);
     double  w = Img.cols;
     double  h = Img.rows;
-
-
+    MyFilledCircle( Img_out, Point( w/2.0, w/2.0),w );
     for (int  y = 0 ; y < h ; y++)
     {
         // normalize y coordinate to -1 ... 1
@@ -58,51 +70,41 @@ int main()
             // of the image, depending on image dimensions
             // you can experiment with images with different dimensions
             double r = sqrt(nx2+ny2);
+            double theta = atan2(ny,nx);
             // discard pixels outside from circle!
             if (0.0<=r&&r<=1.0)
             {
-                double nr = sqrt(1.0-r*r);
-                // new distance is between 0 ... 1
-                nr = (r + (1.0-nr)) /2.0;
+
+                double nr;
+                //normal spherize
+                //nr = (r + (1.0-sqrt(1.0-r*r))) /2.0;
+                //inverse spherize
+                nr = (2.0*r-1.0+sqrt((-4.0)*r*r + 4.0*r+1))/2.0;
                 // discard radius greater than 1.0
                 if (nr<=1.0)
-                    {
-                        // calculate the angle for polar coordinates
-                        double theta = atan2(ny,nx);
-                        // calculate new x position with new distance in same angle
-                        double nxn = nr*cos(theta);
-                        // calculate new y position with new distance in same angle
-                        double nyn = nr*sin(theta);
-                        // map from -1 ... 1 to image coordinates
-                        int x2 = (int)(((nxn+1.0)*w)/2.0);
-                        // map from -1 ... 1 to image coordinates
-                        int y2 = (int)(((nyn+1.0)*h)/2.0);
-                    //    if(x2<w && y2 < h)
-                            Img_out.at<Vec3b>(y,x) = Img.at<Vec3b>(y2,x2);
+                {
 
-                     }
+                    // calculate the angle for polar coordinates
+                    // calculate new x position with new distance in same angle
+                    double nxn = nr*cos(theta);
+                    // calculate new y position with new distance in same angle
+                    double nyn = nr*sin(theta);
+                    // map from -1 ... 1 to image coordinates
+                    int x2 = (int)(((nxn+1.0)*w)/2.0);
+                    // map from -1 ... 1 to image coordinates
+                    int y2 = (int)(((nyn+1.0)*h)/2.0);
+                    // if(x2<w && y2 < h)
+                    Img_out.at<Vec3b>(y,x) = Img.at<Vec3b>(y2,x2);
+
+                }
             }
-
-/*
-            y0 = y - Center.y;
-            x0 = x - Center.x;
-            Dis = sqrt(pow(x0,2) + pow(y0,2));
-            theta = atan2(y0,x0);
-            new_Dis = Dis*(1 + k*pow(Dis,2));
-            new_x = (int)(new_Dis * cos(theta)) + Center.x;
-            new_y = (int)(new_Dis * sin(theta)) + Center.y;
-            if(new_x <width && new_y <height && new_x >=0 && new_y>=0)
-            {
-                Img_out.at<Vec3b>(new_y,new_x) = Img.at<Vec3b>(y,x);
-            }
-*/
-
-
          }
     }
 
+
     imshow("rig",Img);
     imshow("out",Img_out);
+   // imshow("t",test);
     waitKey(0);
 
 }

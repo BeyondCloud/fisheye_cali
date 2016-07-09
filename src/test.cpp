@@ -263,11 +263,9 @@ int main(int argc, char* argv[])
     Size imageSize;
     int mode = s.inputType == Settings::IMAGE_LIST ? CAPTURING : DETECTION;
 
-
     clock_t prevTimestamp = 0;
     const Scalar RED(0,0,255), GREEN(0,255,0);
     const char ESC_KEY = 27;
-
     //! [get_input]
     for(;;)
     {
@@ -384,7 +382,7 @@ int main(int argc, char* argv[])
 
         if( key  == ESC_KEY )
             break;
-
+        cout<<mode;
         if( key == 'u' && mode == CALIBRATED )
            s.showUndistorsed = !s.showUndistorsed;
 
