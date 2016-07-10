@@ -47,12 +47,16 @@ int main()
         return 0;
     }
 
-    Mat Img_out = imread("image.png",CV_LOAD_IMAGE_COLOR);;
-    Mat test = imread("image.png",CV_LOAD_IMAGE_COLOR);;
+    Mat Img_out = imread("image.png",CV_LOAD_IMAGE_COLOR);
+    Mat test = imread("image.png",CV_LOAD_IMAGE_COLOR);
     Img_out = Scalar(0,0,255);
     double  w = Img.cols;
     double  h = Img.rows;
+    Mat mat_x =Mat(w, h, CV_16S),
+        mat_y =Mat(w, h, CV_16S);
+
     MyFilledCircle( Img_out, Point( w/2.0, w/2.0),w );
+
     for (int  y = 0 ; y < h ; y++)
     {
         // normalize y coordinate to -1 ... 1
@@ -83,7 +87,6 @@ int main()
                 // discard radius greater than 1.0
                 if (nr<=1.0)
                 {
-
                     // calculate the angle for polar coordinates
                     // calculate new x position with new distance in same angle
                     double nxn = nr*cos(theta);
@@ -95,16 +98,50 @@ int main()
                     int y2 = (int)(((nyn+1.0)*h)/2.0);
                     // if(x2<w && y2 < h)
                     Img_out.at<Vec3b>(y,x) = Img.at<Vec3b>(y2,x2);
+                    if(!mat_x.at<int>(y,x))
+                        mat_x.at<int>(y,x) = x2;
+                    if(!mat_y.at<int>(y,x))
+                        mat_y.at<int>(y,x) = y2;
 
                 }
             }
          }
     }
+//    FileStorage fs("test.xml", cv::FileStorage::WRITE);
+//    fs << "cols" << w;
+//    fs << "rols" << h;
+//    fs << "mat_x" << mat_x;
+//    fs << "mat_y" << mat_y;
+//    fs.release();
+    Mat mat_nx =Mat(w, h, CV_32S),
+        mat_ny =Mat(w, h, CV_32S);
+
+    Mat lookup = imread("image.png",CV_LOAD_IMAGE_COLOR);
+    Mat nlookup= imread("image.png",CV_LOAD_IMAGE_COLOR);
+
+    FileStorage fs("test.xml", cv::FileStorage::READ);
+    int rw;
+    int rh;
+    fs["cols"] >> rw;
+    fs["rols"] >> rh;
+    fs["mat_x"] >> mat_nx;
+    fs["mat_y"] >> mat_ny;
+    for (int  y = 0 ; y < rh ; y++)
+    {
+            for (int  x = 0 ; x < rw ; x++)
+            {
+                nlookup.at<Vec3b>(y,x)=lookup.at<Vec3b>(
+                                                       mat_ny.at<int>(y,x),
+                                                       mat_nx.at<int>(y,x)
+                                                       );
+            }
+    }
+    imshow("t",nlookup);
+    fs.release();
 
 
-    imshow("rig",Img);
-    imshow("out",Img_out);
-   // imshow("t",test);
+//    imshow("rig",Img);
+//    imshow("out",Img_out);
     waitKey(0);
 
 }
