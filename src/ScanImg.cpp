@@ -24,6 +24,11 @@ using namespace cv;
 
 #define pi 3.1415926
 
+struct mapPoint_t
+{
+    int x;
+    int y;
+};
 void MyFilledCircle( Mat img, Point center,double w )
 {
  int thickness = -1;
@@ -43,57 +48,6 @@ struct rmpData_t
     Mat map_x;
     Mat map_y;
 };
-void rmpRead(rmpData_t &r)
-{
-    FileStorage fs("test.xml", cv::FileStorage::READ);
-    fs["cols"] >> r.cols;
-    fs["rows"] >> r.rows;
-    fs["map_x"] >> r.map_x;
-    fs["map_y"] >> r.map_y;
-    fs.release();
-}
-void rmpWrite(rmpData_t &r)
-{
-        FileStorage fs("test.xml", cv::FileStorage::WRITE);
-        cout<<"data below write to test.xml:\n";
-        fs << "cols" << r.cols;
-        cout<<"cols = "<<r.cols<<"\n";
-        fs << "rows" << r.rows;
-        cout<<"rows = "<<r.rows<<"\n";
-        fs << "map_x" << r.map_x;
-        cout<<"map x value\n";
-        fs << "map_y" << r.map_y;
-        cout<<"map y value"<<"\n";
-        fs.release();
-}
-Mat& ScanImageAndReduceC(Mat& I, const uchar* const table)
-{
-    // accept only char type matrices
-    CV_Assert(I.depth() == CV_8U);
-
-    int channels = I.channels();
-
-    int nRows = I.rows;
-    int nCols = I.cols * channels;
-
-    if (I.isContinuous())
-    {
-        nCols *= nRows;
-        nRows = 1;
-    }
-
-    int i,j;
-    uchar* p;
-    for( i = 0; i < nRows; ++i)
-    {
-        p = I.ptr<uchar>(i);
-        for ( j = 0; j < nCols; ++j)
-        {
-            p[j] = table[p[j]];
-        }
-    }
-    return I;
-}
 int main()
 {
     Mat Img;
@@ -113,15 +67,17 @@ int main()
     Mat map_x =Mat(w, h, CV_32FC1),
         map_y =Mat(w, h, CV_32FC1);
 
-    MyFilledCircle( Img_out, Point( w/2.0, w/2.0),w );
 
-    for (int  y = 0 ; y < h ; y++)
+    MyFilledCircle( Img_out, Point( w/2.0, w/2.0),w );
+    int cnt = 0;
+
+    for (int  y = 0 ; y < Img.rows ; y++)
     {
         // normalize y coordinate to -1 ... 1
         double ny = ((2*y)/h)-1;
         // pre calculate ny*ny
         double ny2 = ny*ny;
-        for (int  x = 0 ; x < w ; x++)
+        for (int  x = 0 ; x < Img.cols ; x++)
         {
             // normalize x coordinate to -1 ... 1
             double nx = ((2*x)/w)-1;
@@ -147,7 +103,7 @@ int main()
                 {
                     // calculate the angle for polar coordinates
                     // calculate new x position with new distance in same angle
-                    double nxn = nr*cos(theta);
+                     double nxn = nr*cos(theta);
                     // calculate new y position with new distance in same angle
                     double nyn = nr*sin(theta);
                     // map from -1 ... 1 to image coordinates
@@ -158,57 +114,77 @@ int main()
                     Img_out.at<Vec3b>(y,x) = Img.at<Vec3b>(y2,x2);
                     map_x.at<int>(y,x) = x2;
                     map_y.at<int>(y,x) = y2;
-
                 }
+
             }
          }
     }
 
-//    FileStorage fs("test.xml", cv::FileStorage::WRITE);
-//    fs << "cols" << w;
-//    fs << "rows" << h;
-//    fs << "map_x" << map_x;
-//    fs << "map_y" << map_y;
-//    fs.release();
-
-
     Mat src  = imread("image.png",CV_LOAD_IMAGE_COLOR);
     Mat dst = src.clone();
+    cvtColor(src,src,COLOR_RGB2GRAY);
+    cvtColor(dst,dst,COLOR_RGB2GRAY);
 
    rmpData_t rmp_data;
     rmp_data.cols = w;
     rmp_data.rows = h;
     rmp_data.map_x = map_x;
     rmp_data.map_y = map_y;
+
+
+
 //    rmpWrite(rmp_data);
 //   rmpRead(rmp_data);
 //    cout<<rmp_data.cols;
 
     double  t = ( double )getTickCount();
 //    ===========on the fly method=========================================
-//    0.03sec
-    for (int  y = 0 ; y < rmp_data.rows ; y++)
-    {
-            for (int  x = 0 ; x < rmp_data.cols ; x++)
-            {
-                dst.at<Vec3b>(y,x)=src.at<Vec3b>(
-                                                       map_y.at<int>(y,x),
-                                                       map_x.at<int>(y,x)
-                                                );
-            }
-    }
-//    ===========remap method(float): 0.05sec=================================================
-//    remap( src, dst, map_x, map_y, INTER_LINEAR, BORDER_CONSTANT, Scalar(0,0, 0) );
-//    =========LUT===========================================
+//    0.026sec
+//    for (int  i = 0 ; i < rmp_data.rows ; i++)
+//    {
+//            for (int  j = 0 ; j < rmp_data.cols ; j++)
+//            {
+//
+//
+//                dst.at<uchar>(i,j)=src.at<uchar>(
+//                                                       map_y.at<int>(i,j),
+//                                                       map_x.at<int>(i,j)
+//                                                );
+//            }
+//    }
 
+//=================================================
+//  0.021 sec
+
+    uchar *p;
+    uchar *q;
+    cnt=0;
+    int j = 0;
+
+    for( int i = 0; i < rmp_data.rows ; ++i)
+    {
+        p = dst.ptr<uchar>(i);
+       // q = src.ptr<uchar>( i);
+        // and both image are in float!
+        for (j = 0; j <rmp_data.cols; ++j)
+        {
+            // Do whatever you want
+            //p[ j ] = q[ map_x.at<int>(i,j)];
+            p[ j ] =src.at<uchar>(map_y.at<int>(i,j),map_x.at<int>(i,j));
+           // p[ j ] = q[rmp_data.cols-j];
+        }
+    }
+//=========================================================
     t = (( double )getTickCount() - t)/getTickFrequency();
     cout <<  "Times passed in seconds: "  << t << endl;
     imshow("t",dst);
+    imshow("s",src);
 
 
 
 //    imshow("rig",Img);
 //    imshow("out",Img_out);
     waitKey(0);
+
 
 }
