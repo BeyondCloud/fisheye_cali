@@ -22,22 +22,27 @@ using namespace cv;
 #define pi 3.1415926
 #define CLIP_ORIGIN_X 0
 #define CLIP_ORIGIN_Y 0
-#define CLIP_WIDTH 800
-#define CLIP_HEIGHT 800
+#define CLIP_WIDTH 1920
+#define CLIP_HEIGHT 1920
 struct myPoint
 {
     int x;
     int y;
 };
-void MyFilledCircle( Mat img, Point center,double w )
+struct fisheye_t
 {
- int thickness = -1;
+    Point center;
+    int r;//radius
+};
+void MyFilledCircle( Mat img, Point center,double r )
+{
+ int thickness = 1;
  int lineType = 8;
 
  circle( img,
          center,
-         w/2,
-         Scalar( 0, 255, 0 ),
+         r,
+         Scalar( 255, 255, 255 ),
          thickness,
          lineType );
 }
@@ -48,37 +53,26 @@ struct rmpData_t
     Mat map_x;
     Mat map_y;
 };
-int main()
+void fisheye_boarder(Mat &src,Mat &Img,fisheye_t &feye)
 {
-    VideoCapture cap(0);
-//    cap.set(CV_CAP_PROP_FOURCC ,CV_FOURCC('M', 'J', 'P', 'G') );
-//    cap.set(CV_CAP_PROP_FRAME_WIDTH,480);
-//    cap.set(CV_CAP_PROP_FRAME_HEIGHT,480);
-
-    Mat frame;
-    frame = imread("image.png",CV_LOAD_IMAGE_COLOR);
-
-    frame = Mat(frame, Rect(CLIP_ORIGIN_X,CLIP_ORIGIN_Y,CLIP_WIDTH,CLIP_HEIGHT));
-
-    if(!frame.data)
-    {
-        cout<<"fail to load image";
-        return 0;
-    }
-    cvtColor(frame, frame, CV_BGR2GRAY);
-    Mat tmp = frame;
-    Mat Img = frame;
-    Mat Img_out = Img.clone();
-
- //   Img_out = Scalar(0,0,255);
+    copyMakeBorder(src,Img,max(0,feye.r - feye.center.y)
+                            ,max(0,feye.r - (Img.rows - feye.center.y) )
+                            ,max(0,feye.r - feye.center.x)
+                            ,max(0,feye.r - (Img.cols - feye.center.x))
+                            ,BORDER_CONSTANT , Scalar(0,0,0));
+    cout<<"boarder top,down,left,right";
+    cout<<max(0,feye.r - feye.center.y)<<"\n";
+    cout<<max(0,feye.r - (Img.rows - feye.center.y) )<<"\n";
+    cout<<max(0,feye.r - feye.center.x)<<"\n";
+    cout<<max(0,feye.r - (Img.cols - feye.center.x))<<"\n";
+    feye.center.x += max(0,feye.r - feye.center.x);
+    feye.center.y += max(0,feye.r - feye.center.y);
+    MyFilledCircle(Img,feye.center,feye.r);
+}
+void fisheye_tbl_create(Mat &Img,Mat &map_x,Mat &map_y)
+{
     double  w = Img.cols;
     double  h = Img.rows;
-    Mat map_x =Mat(w, h, CV_32FC1),
-        map_y =Mat(w, h, CV_32FC1);
-    MyFilledCircle( Img_out, Point( w/2.0, w/2.0),w );
-
-    vector<Point> data;
-
     for (int  y = 0; y <Img.rows ; y++)
     {
         // normalize y coordinate to -1 ... 1
@@ -111,7 +105,7 @@ int main()
                 {
                     // calculate the angle for polar coordinates
                     // calculate new x position with new distance in same angle
-                     double nxn = nr*cos(theta);
+                    double nxn = nr*cos(theta);
                     // calculate new y position with new distance in same angle
                     double nyn = nr*sin(theta);
                     // map from -1 ... 1 to image coordinates
@@ -124,28 +118,86 @@ int main()
                      map_y.at<int>(y,x) = y2;
                 }
             }
-            //else
-                   // data.push_back(Point(x,y));
-
+            else
+            {
+                map_x.at<int>(y,x) = x;
+                map_y.at<int>(y,x) = y;
+            }
          }
     }
 
-    Mat src  = imread("image.png",CV_LOAD_IMAGE_COLOR);
-    Mat dst = src.clone();
-    cvtColor(src,src,COLOR_RGB2GRAY);
-    cvtColor(dst,dst,COLOR_RGB2GRAY);
-    rmpData_t rmp_data;
-    rmp_data.cols = w;
-    rmp_data.rows = h;
-    rmp_data.map_x = map_x;
-    rmp_data.map_y = map_y;
 
+}
+int main()
+{
+    VideoCapture cap(0);
+//    cap.set(CV_CAP_PROP_FOURCC ,CV_FOURCC('M', 'J', 'P', 'G') );
+//    cap.set(CV_CAP_PROP_FRAME_WIDTH,480);
+//    cap.set(CV_CAP_PROP_FRAME_HEIGHT,480);
+
+    Mat Img,frame;
+    frame = imread("grid2.png");
+    if(!frame.data)
+    {
+        cout<<"fail to open image";
+        return 0;
+    }
+    cvtColor(frame, frame, CV_BGR2GRAY);
+
+    fisheye_t feye;
+    feye.center.x = 500;
+    feye.center.y = 360;
+    feye.r = 500;
+    Img = frame.clone();
+    imshow("orig",Img);
+    fisheye_boarder(frame,Img,feye);
+    imshow("after boarder",Img);
+    Img = Mat(Img, Rect(0,0,feye.r*2,feye.r*2));
+    imshow("after clip",Img);
+//    copyMakeBorder (  frame , Img,  abs(frame.cols-frame.rows)/2 ,
+//                     abs(frame.cols-frame.rows)/2, 0 , 0 ,BORDER_CONSTANT , Scalar(0,0,0)  ) ;
+
+ //   Img_out = Scalar(0,0,255);
+
+    Mat map_x =Mat(Img.rows,Img.cols,CV_32FC1),
+        map_y =Mat(Img.rows,Img.cols,CV_32FC1);
+    Mat Img_out = Img.clone();
+    fisheye_tbl_create(Img,map_x,map_y);
+    Point center(Img.rows/2,Img.cols/2);
+    int delta_x = 400;
+    int delta_y = 100;
+    for (int  y = center.y - delta_y; y <  center.y + delta_y; y++)
+    {
+        for (int  x = center.x - delta_x; x <  center.x + delta_x; x++)
+        {
+            Img_out.at<uchar>(y,x) = Img.at<uchar>(map_y.at<int>(y,x),map_x.at<int>(y,x));
+        }
+    }
+    imshow("de-fisheye",Img_out);
+
+    waitKey();
+//    MyFilledCircle( Img, Point( w/2.0, w/2.0),w/2 );
+
+//    vector<Point> data;
+
+
+
+//    Mat src  = imread("image.png",CV_LOAD_IMAGE_COLOR);
+//    Mat dst = src.clone();
+//    cvtColor(src,src,COLOR_RGB2GRAY);
+//    cvtColor(dst,dst,COLOR_RGB2GRAY);
+//    rmpData_t rmp_data;
+//    rmp_data.cols = w;
+//    rmp_data.rows = h;
+//    rmp_data.map_x = map_x;
+//    rmp_data.map_y = map_y;
+//
 
 
 //    rmpWrite(rmp_data);
 //   rmpRead(rmp_data);
 //    cout<<rmp_data.cols;
-
+/*
         int nRows = Img.rows;
         int nCols = Img.cols;
         if (Img.isContinuous())
@@ -155,30 +207,28 @@ int main()
             cout<<"is continue";
         }
 
-
-     for(;;)
+    Mat Img_out(CLIP_HEIGHT,CLIP_WIDTH,CV_8UC1),test;
+//     for(;;)
     {
         cap>>frame;
-//        frame = Mat(frame, Rect(CLIP_ORIGIN_X,CLIP_ORIGIN_Y,CLIP_WIDTH,CLIP_HEIGHT));
+        frame = Mat(frame, Rect(CLIP_ORIGIN_X,CLIP_ORIGIN_Y,CLIP_WIDTH,CLIP_HEIGHT));
         cvtColor(frame, frame, CV_BGR2GRAY);
-        Img = frame;
+        test = frame;
 //    ===========on the fly method=========================================
 //    0.018sec
-     int cnt=0;
  double  t = ( double )getTickCount();
 
-    for (int  i = CLIP_ORIGIN_Y ; i < CLIP_HEIGHT+CLIP_ORIGIN_Y; i++)
+    for (int  y = CLIP_ORIGIN_Y ; y < CLIP_HEIGHT+CLIP_ORIGIN_Y; y++)
     {
-            for (int  j = CLIP_ORIGIN_X ; j < CLIP_WIDTH + CLIP_ORIGIN_X ; j++)
+            for (int  x = CLIP_ORIGIN_X ; x < CLIP_WIDTH + CLIP_ORIGIN_X ; x++)
             {
-                Img_out.at<uchar>(i,j)=Img.at<uchar>(
-                                                       map_y.at<int>(i,j),
-                                                       map_x.at<int>(i,j)
+                Img_out.at<uchar>(x,y)=test.at<uchar>(
+                                                       map_x.at<int>(x,y),
+                                                       map_y.at<int>(x,y)
                                                 );
-                cnt++;
             }
-
     }
+
 t = (( double )getTickCount() - t)/getTickFrequency();
 //=================================================
 //  0.018 sec
@@ -205,7 +255,7 @@ t = (( double )getTickCount() - t)/getTickFrequency();
 //    uchar *out;
 //    uchar *in;
 //
-//        cnt = 0;
+//    int  cnt = 0;
 //    vector<Point>::iterator it = data.begin();
 //    double  t = ( double )getTickCount();
 //
@@ -222,9 +272,10 @@ t = (( double )getTickCount() - t)/getTickFrequency();
 //================================================
     cout <<  "Times passed in seconds: "  << t << endl;
 
-        imshow("int", Img_out);
+        imshow("in", Img_out);
+
          if(waitKey(30) >= 0) break;
-    }
+//    }
 
     imshow("out",Img_out);
 //    imshow("s",src);
@@ -232,6 +283,6 @@ t = (( double )getTickCount() - t)/getTickFrequency();
 //    imshow("rig",Img);
 //    imshow("out",Img_out);
     waitKey(0);
-
+*/
 
 }

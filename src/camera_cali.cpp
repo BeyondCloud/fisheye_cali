@@ -23,13 +23,13 @@ int main(int argc, char* argv[])
 {
     VideoCapture cap(0);
     cap.set(CV_CAP_PROP_FOURCC ,CV_FOURCC('M', 'J', 'P', 'G') );
-    cap.set(CV_CAP_PROP_FRAME_WIDTH,640);
-    cap.set(CV_CAP_PROP_FRAME_HEIGHT,480);
     for(;;)
     {
         Mat frame;
+        Mat img;
         cap>>frame;
-        imshow("fuji", frame);
+        copyMakeBorder (  frame , img,  abs(frame.cols-frame.rows)/2 , abs(frame.cols-frame.rows)/2, 0 , 0 ,BORDER_CONSTANT , Scalar(0,0,0)  ) ;
+        imshow("fuji", img);
         if(waitKey(30) >= 0) break;
     }
     //! [file_read]
