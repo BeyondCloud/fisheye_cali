@@ -20,11 +20,11 @@ using namespace cv;
 
 
 #define pi 3.1415926
-#define CLIP_ORIGIN_X 10
-#define CLIP_ORIGIN_Y 100
-#define CLIP_WIDTH 640
-#define CLIP_HEIGHT 640
-struct mapPoint_t
+#define CLIP_ORIGIN_X 0
+#define CLIP_ORIGIN_Y 0
+#define CLIP_WIDTH 800
+#define CLIP_HEIGHT 800
+struct myPoint
 {
     int x;
     int y;
@@ -56,7 +56,6 @@ int main()
 //    cap.set(CV_CAP_PROP_FRAME_HEIGHT,480);
 
     Mat frame;
-    //cap>>frame;
     frame = imread("image.png",CV_LOAD_IMAGE_COLOR);
 
     frame = Mat(frame, Rect(CLIP_ORIGIN_X,CLIP_ORIGIN_Y,CLIP_WIDTH,CLIP_HEIGHT));
@@ -78,20 +77,15 @@ int main()
         map_y =Mat(w, h, CV_32FC1);
     MyFilledCircle( Img_out, Point( w/2.0, w/2.0),w );
 
-//    mapPoint_t mapPoint;
-//    vector<mapPoint_t> mpvec;
     vector<Point> data;
-//    mpvec.resize(Img.cols*Img.rows);
 
-    for (int  y = 0 ; y < Img.rows ; y++)
+    for (int  y = 0; y <Img.rows ; y++)
     {
         // normalize y coordinate to -1 ... 1
         double ny = ((2*y)/h)-1;
         // pre calculate ny*ny
         double ny2 = ny*ny;
-
-
-        for (int  x = 0 ; x < Img.cols ; x++)
+        for (int  x = 0 ; x <Img.cols ; x++)
         {
             // normalize x coordinate to -1 ... 1
             double nx = ((2*x)/w)-1;
@@ -125,14 +119,13 @@ int main()
                     // map from -1 ... 1 to image coordinates
                     int y2 = (int)(((nyn+1.0)*h)/2.0);
                     // Img_out.at<Vec3b>(y,x) = Img.at<Vec3b>(y2,x2);
-                    data.push_back(Point(x2,y2));
-                    //  map_x.at<int>(y,x) = x2;
-                    // map_y.at<int>(y,x) = y2;
+                    //data.push_back(Point(x2,y2));
+                     map_x.at<int>(y,x) = x2;
+                     map_y.at<int>(y,x) = y2;
                 }
-
             }
-            else
-                    data.push_back(Point(x,y));
+            //else
+                   // data.push_back(Point(x,y));
 
          }
     }
@@ -141,8 +134,7 @@ int main()
     Mat dst = src.clone();
     cvtColor(src,src,COLOR_RGB2GRAY);
     cvtColor(dst,dst,COLOR_RGB2GRAY);
-
-   rmpData_t rmp_data;
+    rmpData_t rmp_data;
     rmp_data.cols = w;
     rmp_data.rows = h;
     rmp_data.map_x = map_x;
@@ -154,23 +146,42 @@ int main()
 //   rmpRead(rmp_data);
 //    cout<<rmp_data.cols;
 
-//    ===========on the fly method=========================================
-//    0.026sec
-//    for (int  i = 0 ; i < rmp_data.rows ; i++)
-//    {
-//            for (int  j = 0 ; j < rmp_data.cols ; j++)
-//            {
-//
-//
-//                dst.at<uchar>(i,j)=src.at<uchar>(
-//                                                       map_y.at<int>(i,j),
-//                                                       map_x.at<int>(i,j)
-//                                                );
-//            }
-//    }
+        int nRows = Img.rows;
+        int nCols = Img.cols;
+        if (Img.isContinuous())
+        {
+            nCols *= nRows;
+            nRows = 1;
+            cout<<"is continue";
+        }
 
+
+     for(;;)
+    {
+        cap>>frame;
+//        frame = Mat(frame, Rect(CLIP_ORIGIN_X,CLIP_ORIGIN_Y,CLIP_WIDTH,CLIP_HEIGHT));
+        cvtColor(frame, frame, CV_BGR2GRAY);
+        Img = frame;
+//    ===========on the fly method=========================================
+//    0.018sec
+     int cnt=0;
+ double  t = ( double )getTickCount();
+
+    for (int  i = CLIP_ORIGIN_Y ; i < CLIP_HEIGHT+CLIP_ORIGIN_Y; i++)
+    {
+            for (int  j = CLIP_ORIGIN_X ; j < CLIP_WIDTH + CLIP_ORIGIN_X ; j++)
+            {
+                Img_out.at<uchar>(i,j)=Img.at<uchar>(
+                                                       map_y.at<int>(i,j),
+                                                       map_x.at<int>(i,j)
+                                                );
+                cnt++;
+            }
+
+    }
+t = (( double )getTickCount() - t)/getTickFrequency();
 //=================================================
-//  0.021 sec
+//  0.018 sec
 
 //    int j = 0;
 //    for( int i = 0; i < rmp_data.rows ; ++i)
@@ -189,33 +200,30 @@ int main()
 //=========================================================
 
 //======================
-
-    for(;;)
-    {
-            double  t = ( double )getTickCount();
-
-        cap>>frame;
-        frame = Mat(frame, Rect(CLIP_ORIGIN_X,CLIP_ORIGIN_Y,CLIP_WIDTH,CLIP_HEIGHT));
-        cvtColor(frame, frame, CV_BGR2GRAY);
-        uchar *out;
-        uchar *in;
-        Img = frame;
-        int cnt = 0;
-        for( int i = 0; i < Img.rows ; ++i)
-        {
-            for (int j = 0; j <Img.cols; ++j)
-            {
-                in     = Img.ptr<uchar>(data[cnt].y);
-                out    = Img_out.ptr<uchar>(i);
-                out[j] = in[data[cnt].x];
-                cnt++;
-            }
-        }
-    t = (( double )getTickCount() - t)/getTickFrequency();
+//0.016 1080x1080
+//
+//    uchar *out;
+//    uchar *in;
+//
+//        cnt = 0;
+//    vector<Point>::iterator it = data.begin();
+//    double  t = ( double )getTickCount();
+//
+//        for( int i = 0; i < nRows ; ++i)
+//        {
+//            for (int j = 0; j <nCols; ++j)
+//            {
+//                in     = Img.ptr<uchar>(data[cnt].y );
+//                out    = Img_out.ptr<uchar>(i);
+//                out[j] = in[data[cnt].x];
+//                cnt++;
+//            }
+//        }
+//================================================
     cout <<  "Times passed in seconds: "  << t << endl;
 
         imshow("int", Img_out);
-        if(waitKey(30) >= 0) break;
+         if(waitKey(30) >= 0) break;
     }
 
     imshow("out",Img_out);

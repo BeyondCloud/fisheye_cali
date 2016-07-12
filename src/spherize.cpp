@@ -23,6 +23,10 @@ using namespace std;
 using namespace cv;
 
 #define pi 3.1415926
+#define CLIP_ORIGIN_X 0
+#define CLIP_ORIGIN_Y 0
+#define CLIP_WIDTH 1080
+#define CLIP_HEIGHT 1080
 
 void MyFilledCircle( Mat img, Point center,double w )
 {
@@ -96,8 +100,14 @@ Mat& ScanImageAndReduceC(Mat& I, const uchar* const table)
 }
 int main()
 {
-    Mat Img;
-    Img = imread("image.png",CV_LOAD_IMAGE_COLOR);
+    VideoCapture cap(0);
+    Mat Img,frame;
+    cap>>frame;
+    frame = Mat(frame, Rect(CLIP_ORIGIN_X,CLIP_ORIGIN_Y,CLIP_WIDTH,CLIP_HEIGHT));
+    cvtColor(frame, frame, CV_BGR2GRAY);
+    Img = frame;
+
+//   Img = imread("image.png",CV_LOAD_IMAGE_COLOR);
 //    cvtColor(Img, Img, CV_BGR2GRAY);
     if(!Img.data)
     {
@@ -105,7 +115,7 @@ int main()
         return 0;
     }
 
-    Mat Img_out = imread("image.png",CV_LOAD_IMAGE_COLOR);
+    Mat Img_out = Img.clone();
     Mat test = imread("image.png",CV_LOAD_IMAGE_COLOR);
     Img_out = Scalar(0,0,255);
     double  w = Img.cols;
@@ -148,7 +158,7 @@ int main()
                     // calculate the angle for polar coordinates
                     // calculate new x position with new distance in same angle
                     double nxn = nr*cos(theta);
-                    // calculate new y position with new distance in same angle
+                    // calculate new y position with new distanc,e in same angle
                     double nyn = nr*sin(theta);
                     // map from -1 ... 1 to image coordinates
                     int x2 = (int)(((nxn+1.0)*w)/2.0);
@@ -158,7 +168,6 @@ int main()
                     Img_out.at<Vec3b>(y,x) = Img.at<Vec3b>(y2,x2);
                     map_x.at<int>(y,x) = x2;
                     map_y.at<int>(y,x) = y2;
-
                 }
             }
          }
@@ -174,8 +183,7 @@ int main()
 
     Mat src  = imread("image.png",CV_LOAD_IMAGE_COLOR);
     Mat dst = src.clone();
-
-   rmpData_t rmp_data;
+    rmpData_t rmp_data;
     rmp_data.cols = w;
     rmp_data.rows = h;
     rmp_data.map_x = map_x;
@@ -183,29 +191,34 @@ int main()
 //    rmpWrite(rmp_data);
 //   rmpRead(rmp_data);
 //    cout<<rmp_data.cols;
-
-    double  t = ( double )getTickCount();
-//    ===========on the fly method=========================================
-//    0.03sec
-    for (int  y = 0 ; y < rmp_data.rows ; y++)
+     for(;;)
     {
-            for (int  x = 0 ; x < rmp_data.cols ; x++)
-            {
-                dst.at<Vec3b>(y,x)=src.at<Vec3b>(
-                                                       map_y.at<int>(y,x),
-                                                       map_x.at<int>(y,x)
-                                                );
-            }
+            cap>>frame;
+            frame = Mat(frame, Rect(CLIP_ORIGIN_X,CLIP_ORIGIN_Y,CLIP_WIDTH,CLIP_HEIGHT));
+            cvtColor(frame, frame, CV_BGR2GRAY);
+            Img = frame;
+        double  t = ( double )getTickCount();
+    //    ===========on the fly method=========================================
+    //    0.018sec 1080 x1080
+         for (int  y = 0 ; y < Img.rows ; y++)
+        {
+                for (int  x = 0 ; x < Img.cols ; x++)
+                {
+                    Img_out.at<uchar>(y,x)=Img.at<uchar>(
+                                                           map_y.at<int>(y,x),
+                                                           map_x.at<int>(y,x)
+                                                    );
+                }
+        }
+            imshow("out",Img_out);
+        t = (( double )getTickCount() - t)/getTickFrequency();
+        cout <<  "Times passed in seconds: "  << t << endl;
+
     }
 //    ===========remap method(float): 0.05sec=================================================
 //    remap( src, dst, map_x, map_y, INTER_LINEAR, BORDER_CONSTANT, Scalar(0,0, 0) );
 //    =========LUT===========================================
-
-    t = (( double )getTickCount() - t)/getTickFrequency();
-    cout <<  "Times passed in seconds: "  << t << endl;
     imshow("t",dst);
-
-
 
 //    imshow("rig",Img);
 //    imshow("out",Img_out);
