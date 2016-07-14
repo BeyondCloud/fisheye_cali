@@ -34,12 +34,12 @@ struct fisheye_t
     Point center;
     int r;//radius
 };
-void MyFilledCircle( Mat img, Point center,double r )
+void MyFilledCircle( Mat img, Point center,int r )
 {
- int thickness = 1;
- int lineType = 8;
 
- circle( img,
+    int thickness = 1;
+    int lineType = 8;
+    circle( img,
          center,
          r,
          Scalar( 255, 255, 255 ),
@@ -125,9 +125,22 @@ void fisheye_tbl_create(Mat &Img,Mat &map_x,Mat &map_y)
             }
          }
     }
-
-
 }
+void feye_Space_to_src(fisheye_t &feye,Mat &map_x,Mat &map_y)
+{
+    const int delx =feye.center.x-feye.r;
+    const int dely =feye.center.y-feye.r;
+    for (int  y = 0; y <map_x.rows ; y++)
+    {
+        for (int  x = 0 ; x <map_x.cols ; x++)
+        {
+
+             map_x.at<int>(y,x) += delx;
+             map_y.at<int>(y,x) += dely;
+        }
+    }
+}
+
 int main()
 {
     VideoCapture cap(0);
@@ -143,11 +156,10 @@ int main()
         return 0;
     }
     cvtColor(frame, frame, CV_BGR2GRAY);
-
     fisheye_t feye;
-    feye.center.x = 500;
-    feye.center.y = 360;
-    feye.r = 500;
+    feye.center.x = 250;
+    feye.center.y = 187;
+    feye.r = 250;
     Img = frame.clone();
     imshow("orig",Img);
     fisheye_boarder(frame,Img,feye);
@@ -161,18 +173,38 @@ int main()
 
     Mat map_x =Mat(Img.rows,Img.cols,CV_32FC1),
         map_y =Mat(Img.rows,Img.cols,CV_32FC1);
-    Mat Img_out = Img.clone();
     fisheye_tbl_create(Img,map_x,map_y);
+
     Point center(Img.rows/2,Img.cols/2);
-    int delta_x = 400;
-    int delta_y = 100;
-    for (int  y = center.y - delta_y; y <  center.y + delta_y; y++)
+
+    feye_Space_to_src(feye,map_x,map_y);
+
+    int delta_x = 200;
+    int delta_y = 200;
+    Mat Img_out = Mat(delta_x*2,delta_y*2,CV_8UC1);
+    int nRows = Img_out.rows;
+    int nCols = Img_out.cols;
+    uchar *src_ptr;
+    uchar *dst_ptr;
+
+    dst_ptr = Img_out.ptr<uchar>(0);
+    //scan over Img_out by ptr++ since Img_out is continuous;
+    for (int  j =0; j <Img_out.rows; j++)
     {
-        for (int  x = center.x - delta_x; x <  center.x + delta_x; x++)
+        for (int  i = 0; i <  Img_out.cols; i++)
         {
-            Img_out.at<uchar>(y,x) = Img.at<uchar>(map_y.at<int>(y,x),map_x.at<int>(y,x));
+            src_ptr = Img.ptr<uchar>(map_y.at<int>(j,i));
+            *dst_ptr++ = src_ptr[map_x.at<int>(j,i)];
         }
     }
+
+//    for (int  y = center.y - delta_y; y <  center.y + delta_y; y++)
+//    {
+//        for (int  x = center.x - delta_x; x <  center.x + delta_x; x++)
+//        {
+//            Img_out.at<uchar>(y,x) = Img.at<uchar>(map_y.at<int>(y,x),map_x.at<int>(y,x));
+//        }
+//    }
     imshow("de-fisheye",Img_out);
 
     waitKey();

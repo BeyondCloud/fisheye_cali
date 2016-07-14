@@ -13,42 +13,49 @@
 
 using namespace std;
 using namespace cv;
-bool isRun = true;
-inline void kbmgr()
-{
-        if (_kbhit() )
-		{
-			switch (_getch())
-			{
-				case 'e':
-					isRun = false;
-					break;
-			}
-		}
-}
+
 int main(int argc, const char** argv)
 {
+    Mat orig,target;
+    Mat *fptr;
+    orig = imread("grid2.png");
+    cvtColor(orig,orig,CV_RGB2GRAY);
+    target = orig.clone();
 
+    imshow("before", orig);
+    cout<<"addr of orig before" <<&orig<<"\n";
+    cout<<"addr of orig before" <<*orig.ptr<uchar>(0,0)<<"\n";
+    uchar *out;
+    uchar *in;
+    for(int i = 0;i < target.rows;i++)
+    {
+        in = orig.ptr<uchar>(i);
+        out = target.ptr<uchar>(i);
+        for(int j = 0;j < target.cols;j++)
+        {
+            out[j] = in[target.cols -j];
+        }
+    }
+    imshow("target", target);
+    Mat orig2 = imread("sample.png");
+    waitKey();
+    if(!orig2.data)
+    {
+        cout<<"sample.png open failed";
+        return 0;
+    }
+        for(int i = 0;i < target.rows;i++)
+    {
 
-	VideoCapture cap(0); // open the camera 1
-    cap.set(CV_CAP_PROP_FOURCC ,CV_FOURCC('M', 'J', 'P', 'G') );
-    cap.set(CV_CAP_PROP_FRAME_WIDTH,800);
-    cap.set(CV_CAP_PROP_FRAME_HEIGHT,600);
-//    Size patternsize(8,6); //number of centers
-//     vector<Point2f> centers; //this will be filled by the detected centers
-    if (!cap.isOpened()) //return -1 when no camera found
-		return -1;
-    Mat frame;
-    while(isRun){
+        for(int j = 0;j < target.cols;j++)
+        {
+            orig.at<uchar>(i,j) = 0;
+        }
+    }
+    cout<<"addr of orig after" <<&orig<<"\n";
+    imshow("target after update", target);
+    imshow("orig after update", orig);
 
-        cap >> frame;
- //       bool patternfound = findChessboardCorners(frame,patternsize,centers);
- //       drawChessboardCorners(frame, patternsize, Mat(centers), patternfound);
-
-        kbmgr();
-		imshow("before", frame);
-		waitKey(30);
-	}
-
+    waitKey();
     return 0;
 }
