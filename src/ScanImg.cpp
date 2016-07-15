@@ -24,19 +24,14 @@ using namespace cv;
 #define CLIP_ORIGIN_Y 0
 #define CLIP_WIDTH 1920
 #define CLIP_HEIGHT 1920
-struct myPoint
-{
-    int x;
-    int y;
-};
 struct fisheye_t
 {
+    Point orig;
     Point center;
     int r;//radius
 };
 void MyFilledCircle( Mat img, Point center,int r )
 {
-
     int thickness = 1;
     int lineType = 8;
     circle( img,
@@ -53,22 +48,42 @@ struct rmpData_t
     Mat map_x;
     Mat map_y;
 };
-void fisheye_boarder(Mat &src,Mat &Img,fisheye_t &feye)
+//make window fit fish eye size
+//change fisheye center to new coordinate
+inline void fisheye_boarder(Mat &src,Mat &Img,fisheye_t &feye)
 {
-    copyMakeBorder(src,Img,max(0,feye.r - feye.center.y)
-                            ,max(0,feye.r - (Img.rows - feye.center.y) )
-                            ,max(0,feye.r - feye.center.x)
-                            ,max(0,feye.r - (Img.cols - feye.center.x))
+    int top  = max(0,feye.r - feye.center.y);
+    int down = max(0,feye.r - (Img.rows - feye.center.y) );
+    int left = max(0,feye.r - feye.center.x);
+    int right= max(0,feye.r - (Img.cols - feye.center.x));
+    copyMakeBorder(src,Img,top
+                            ,down
+                            ,left
+                            ,right
                             ,BORDER_CONSTANT , Scalar(0,0,0));
-    cout<<"boarder top,down,left,right";
-    cout<<max(0,feye.r - feye.center.y)<<"\n";
-    cout<<max(0,feye.r - (Img.rows - feye.center.y) )<<"\n";
-    cout<<max(0,feye.r - feye.center.x)<<"\n";
-    cout<<max(0,feye.r - (Img.cols - feye.center.x))<<"\n";
-    feye.center.x += max(0,feye.r - feye.center.x);
-    feye.center.y += max(0,feye.r - feye.center.y);
-    MyFilledCircle(Img,feye.center,feye.r);
+    cout<<"boarder top"<<top<<"\n";
+    cout<<"boarder down"<<down<<"\n";
+    cout<<"boarder left"<<left<<"\n";
+    cout<<"boarder right"<<right<<"\n";
+    feye.center.x = Img.cols/2;
+    feye.center.y = Img.rows/2;
+    feye.orig.x = -left;
+    feye.orig.y = -top;
+    MyFilledCircle(Img,Point(feye.center.x,feye.center.y),feye.r);
 }
+inline void fisheye_clip(Mat &Img,Point &clip_orig,fisheye_t &feye)
+{
+
+
+    Img = Mat(Img, Rect(feye.center.x-feye.r,
+                    feye.center.y-feye.r,
+                    feye.r*2,
+                    feye.r*2));
+    feye.orig.x +=  (feye.center.x-feye.r);
+    feye.orig.y +=  (feye.center.y-feye.r);
+
+}
+//create a square fisheye table
 void fisheye_tbl_create(Mat &Img,Mat &map_x,Mat &map_y)
 {
     double  w = Img.cols;
@@ -126,30 +141,15 @@ void fisheye_tbl_create(Mat &Img,Mat &map_x,Mat &map_y)
          }
     }
 }
-void feye_Space_to_src(fisheye_t &feye,Mat &map_x,Mat &map_y)
-{
-    const int delx =feye.center.x-feye.r;
-    const int dely =feye.center.y-feye.r;
-    for (int  y = 0; y <map_x.rows ; y++)
-    {
-        for (int  x = 0 ; x <map_x.cols ; x++)
-        {
-
-             map_x.at<int>(y,x) += delx;
-             map_y.at<int>(y,x) += dely;
-        }
-    }
-}
 
 int main()
 {
     VideoCapture cap(0);
-//    cap.set(CV_CAP_PROP_FOURCC ,CV_FOURCC('M', 'J', 'P', 'G') );
-//    cap.set(CV_CAP_PROP_FRAME_WIDTH,480);
-//    cap.set(CV_CAP_PROP_FRAME_HEIGHT,480);
-
+    cap.set(CV_CAP_PROP_FOURCC ,CV_FOURCC('M', 'J', 'P', 'G') );
+    cap.set(CV_CAP_PROP_FRAME_WIDTH,1280);
+    cap.set(CV_CAP_PROP_FRAME_HEIGHT,720);
     Mat Img,frame;
-    frame = imread("grid2.png");
+    frame = imread("fish.jpg");
     if(!frame.data)
     {
         cout<<"fail to open image";
@@ -157,47 +157,99 @@ int main()
     }
     cvtColor(frame, frame, CV_BGR2GRAY);
     fisheye_t feye;
-    feye.center.x = 250;
-    feye.center.y = 187;
-    feye.r = 250;
     Img = frame.clone();
-    imshow("orig",Img);
+    feye.center.x = Img.cols/2;  //640
+    feye.center.y = Img.rows/2;  //360
+    feye.r = 720;
+//    imshow("orig",Img);
+//    double  t = ( double )getTickCount();
     fisheye_boarder(frame,Img,feye);
-    imshow("after boarder",Img);
-    Img = Mat(Img, Rect(0,0,feye.r*2,feye.r*2));
-    imshow("after clip",Img);
-//    copyMakeBorder (  frame , Img,  abs(frame.cols-frame.rows)/2 ,
-//                     abs(frame.cols-frame.rows)/2, 0 , 0 ,BORDER_CONSTANT , Scalar(0,0,0)  ) ;
+    imshow("boarder",Img);
+    waitKey();
+//    t = (( double )getTickCount() - t)/getTickFrequency();
+//    cout <<  "Times passed in seconds: "  << t << endl;
 
+//    imshow("after boarder",Img);
+    //Rect originx,originy,width,height
+    cout<<feye.center.x - feye.r<<" "<<feye.center.y - feye.r<<"\n";
+    Point clip_orig(100,100);
+    int clip_w = 600;
+    int clip_h = 200;
+    if(clip_w+clip_orig.x > frame.cols)
+    {
+        cout << "invalid clip window: except clip_w+clip_orig.x < frame.cols:"<<frame.cols<<"\n";
+        return 0;
+    }
+    else if(clip_h+clip_orig.y > frame.rows)
+    {
+        cout << "invalid clip window: except clip_h+clip_orig.y < frame.rows:"<<frame.rows<<"\n";
+        return 0;
+    }
+
+    fisheye_clip(Img,clip_orig,feye);
+
+    imshow("after clip",Img);
+    waitKey();
  //   Img_out = Scalar(0,0,255);
 
     Mat map_x =Mat(Img.rows,Img.cols,CV_32FC1),
         map_y =Mat(Img.rows,Img.cols,CV_32FC1);
+    //now Img is a square image
+    //square table will be created and mapped back to src image coordinate
     fisheye_tbl_create(Img,map_x,map_y);
-
-    Point center(Img.rows/2,Img.cols/2);
-
-    feye_Space_to_src(feye,map_x,map_y);
-
-    int delta_x = 200;
-    int delta_y = 200;
-    Mat Img_out = Mat(delta_x*2,delta_y*2,CV_8UC1);
-    int nRows = Img_out.rows;
-    int nCols = Img_out.cols;
-    uchar *src_ptr;
-    uchar *dst_ptr;
-
-    dst_ptr = Img_out.ptr<uchar>(0);
-    //scan over Img_out by ptr++ since Img_out is continuous;
-    for (int  j =0; j <Img_out.rows; j++)
+    //=======================================================
+    imshow("origin",Img);
+    uchar *sptr;
+    uchar *dptr;
+    Mat test;
+    test= Img.clone();
+    dptr = test.ptr<uchar>(0);
+    for (int  j =0; j <Img.rows; j++)
     {
-        for (int  i = 0; i <  Img_out.cols; i++)
+        for (int  i =0; i <Img.cols; i++)
         {
-            src_ptr = Img.ptr<uchar>(map_y.at<int>(j,i));
-            *dst_ptr++ = src_ptr[map_x.at<int>(j,i)];
+         //   cout<<"x"<<map_x.at<int>(j,i)<<"y"<<map_x.at<int>(j,i)<<"\n";
+            sptr = Img.ptr<uchar>(map_y.at<int>(j,i));
+            *dptr++ = sptr[map_x.at<int>(j,i)];
         }
     }
+    imshow("test",test);
+    waitKey();
+    //=========================================================
 
+
+    imshow("orig",Img);
+    waitKey(0);
+//    feye_Space_to_src(clip_orig,map_x,map_y);
+
+
+
+
+    Mat Img_out = Mat(clip_h,clip_w,CV_8UC1);
+    uchar *src_ptr;
+    uchar *dst_ptr;
+// for(;;)
+ //   {
+ //       cap>>frame;
+//      cvtColor(frame, frame, CV_BGR2GRAY);
+ //       Img = frame;
+        //scan over Img_out by ptr++ since Img_out is continuous;
+        //src image is in fish eye  space
+        dst_ptr = Img_out.ptr<uchar>(0);
+        for (int  j =clip_orig.y-feye.orig.y; j <clip_orig.y-feye.orig.y + clip_h; j++)
+        {
+            for (int  i = clip_orig.x-feye.orig.x; i <clip_orig.x-feye.orig.x + clip_w; i++)
+            {
+             //   cout<<"x"<<map_x.at<int>(j,i)<<"y"<<map_x.at<int>(j,i)<<"\n";
+                src_ptr = Img.ptr<uchar>(map_y.at<int>(j,i));
+                *dst_ptr++ = src_ptr[map_x.at<int>(j,i)];
+            }
+        }
+        imshow("de-fisheye",Img_out);
+        waitKey();
+ //       if(waitKey(30)>=0)
+ //           break;
+ //   }
 //    for (int  y = center.y - delta_y; y <  center.y + delta_y; y++)
 //    {
 //        for (int  x = center.x - delta_x; x <  center.x + delta_x; x++)
@@ -205,7 +257,7 @@ int main()
 //            Img_out.at<uchar>(y,x) = Img.at<uchar>(map_y.at<int>(y,x),map_x.at<int>(y,x));
 //        }
 //    }
-    imshow("de-fisheye",Img_out);
+
 
     waitKey();
 //    MyFilledCircle( Img, Point( w/2.0, w/2.0),w/2 );

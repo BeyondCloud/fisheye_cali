@@ -16,6 +16,18 @@ using namespace cv;
 
 int main(int argc, const char** argv)
 {
+    VideoCapture cap(0);
+    cap.set(CV_CAP_PROP_FOURCC ,CV_FOURCC('M', 'J', 'P', 'G') );
+    cap.set(CV_CAP_PROP_FRAME_WIDTH,1280);
+    cap.set(CV_CAP_PROP_FRAME_HEIGHT,720);
+    Mat frame;
+    for(;;)
+    {
+        cap>>frame;
+        imshow("asdf",frame);
+        if(waitKey(30) >= 0) break;
+    }
+    /*
     Mat orig,target;
     Mat *fptr;
     orig = imread("grid2.png");
@@ -55,7 +67,7 @@ int main(int argc, const char** argv)
     cout<<"addr of orig after" <<&orig<<"\n";
     imshow("target after update", target);
     imshow("orig after update", orig);
-
+    */
     waitKey();
     return 0;
 }
