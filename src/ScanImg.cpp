@@ -114,7 +114,12 @@ void fisheye_tbl_create(Mat &Img,Mat &map_x,Mat &map_y)
                 //normal spherize
                 //nr = (r + (1.0-sqrt(1.0-r*r))) /2.0;
                 //inverse spherize
-                nr = (2.0*r-1.0+sqrt((-4.0)*r*r + 4.0*r+1))/2.0;
+                //nr = sin(r*pi/2.0);
+                //nr = (2.0*r-1.0+sqrt((-4.0)*r*r + 4.0*r+1))/2.0;
+                //nr = (2.0*r-sqrt(0.3)+sqrt((-4.0)*r*r + 4.0*r+0.3))/2.0;
+                double a1 = 0.3,b1 =0.7;
+                double tmp = ((-2.0)*a1+sqrt(4.0*a1*a1+4.0*r*(1.0-2.0*a1)))/(2.0-4.0*a1);
+                nr = b1*2*(tmp-tmp*tmp)+tmp*tmp;
                 // discard radius greater than 1.0
                 if (nr<=1.0)
                 {
@@ -160,21 +165,13 @@ int main()
     Img = frame.clone();
     feye.center.x = Img.cols/2;  //640
     feye.center.y = Img.rows/2;  //360
-    feye.r = 720;
-//    imshow("orig",Img);
-//    double  t = ( double )getTickCount();
+    feye.r = 600;
     fisheye_boarder(frame,Img,feye);
     imshow("boarder",Img);
     waitKey();
-//    t = (( double )getTickCount() - t)/getTickFrequency();
-//    cout <<  "Times passed in seconds: "  << t << endl;
-
-//    imshow("after boarder",Img);
-    //Rect originx,originy,width,height
-    cout<<feye.center.x - feye.r<<" "<<feye.center.y - feye.r<<"\n";
-    Point clip_orig(100,100);
-    int clip_w = 600;
-    int clip_h = 200;
+    Point clip_orig(0,0);
+    int clip_w = 1280;
+    int clip_h = 720;
     if(clip_w+clip_orig.x > frame.cols)
     {
         cout << "invalid clip window: except clip_w+clip_orig.x < frame.cols:"<<frame.cols<<"\n";
@@ -185,45 +182,16 @@ int main()
         cout << "invalid clip window: except clip_h+clip_orig.y < frame.rows:"<<frame.rows<<"\n";
         return 0;
     }
-
     fisheye_clip(Img,clip_orig,feye);
 
     imshow("after clip",Img);
     waitKey();
- //   Img_out = Scalar(0,0,255);
 
     Mat map_x =Mat(Img.rows,Img.cols,CV_32FC1),
         map_y =Mat(Img.rows,Img.cols,CV_32FC1);
     //now Img is a square image
     //square table will be created and mapped back to src image coordinate
     fisheye_tbl_create(Img,map_x,map_y);
-    //=======================================================
-    imshow("origin",Img);
-    uchar *sptr;
-    uchar *dptr;
-    Mat test;
-    test= Img.clone();
-    dptr = test.ptr<uchar>(0);
-    for (int  j =0; j <Img.rows; j++)
-    {
-        for (int  i =0; i <Img.cols; i++)
-        {
-         //   cout<<"x"<<map_x.at<int>(j,i)<<"y"<<map_x.at<int>(j,i)<<"\n";
-            sptr = Img.ptr<uchar>(map_y.at<int>(j,i));
-            *dptr++ = sptr[map_x.at<int>(j,i)];
-        }
-    }
-    imshow("test",test);
-    waitKey();
-    //=========================================================
-
-
-    imshow("orig",Img);
-    waitKey(0);
-//    feye_Space_to_src(clip_orig,map_x,map_y);
-
-
-
 
     Mat Img_out = Mat(clip_h,clip_w,CV_8UC1);
     uchar *src_ptr;

@@ -18,8 +18,8 @@ int main(int argc, const char** argv)
 {
     VideoCapture cap(0);
     cap.set(CV_CAP_PROP_FOURCC ,CV_FOURCC('M', 'J', 'P', 'G') );
-    cap.set(CV_CAP_PROP_FRAME_WIDTH,1280);
-    cap.set(CV_CAP_PROP_FRAME_HEIGHT,720);
+    cap.set(CV_CAP_PROP_FRAME_WIDTH,1920);
+    cap.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
     Mat frame;
     for(;;)
     {
