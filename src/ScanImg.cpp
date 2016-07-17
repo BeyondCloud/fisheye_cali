@@ -48,57 +48,29 @@ struct rmpData_t
     Mat map_x;
     Mat map_y;
 };
-//make window fit fish eye size
-//change fisheye center to new coordinate
-inline void fisheye_boarder(Mat &src,Mat &Img,fisheye_t &feye)
-{
-    int top  = max(0,feye.r - feye.center.y);
-    int down = max(0,feye.r - (Img.rows - feye.center.y) );
-    int left = max(0,feye.r - feye.center.x);
-    int right= max(0,feye.r - (Img.cols - feye.center.x));
-    copyMakeBorder(src,Img,top
-                            ,down
-                            ,left
-                            ,right
-                            ,BORDER_CONSTANT , Scalar(0,0,0));
-    cout<<"boarder top"<<top<<"\n";
-    cout<<"boarder down"<<down<<"\n";
-    cout<<"boarder left"<<left<<"\n";
-    cout<<"boarder right"<<right<<"\n";
-    feye.center.x = Img.cols/2;
-    feye.center.y = Img.rows/2;
-    feye.orig.x = -left;
-    feye.orig.y = -top;
-    MyFilledCircle(Img,Point(feye.center.x,feye.center.y),feye.r);
-}
-inline void fisheye_clip(Mat &Img,Point &clip_orig,fisheye_t &feye)
-{
-
-
-    Img = Mat(Img, Rect(feye.center.x-feye.r,
-                    feye.center.y-feye.r,
-                    feye.r*2,
-                    feye.r*2));
-    feye.orig.x +=  (feye.center.x-feye.r);
-    feye.orig.y +=  (feye.center.y-feye.r);
-
-}
 //create a square fisheye table
-void fisheye_tbl_create(Mat &Img,Mat &map_x,Mat &map_y)
+void fisheye_tbl_create(Mat &Img,Mat &map_x,Mat &map_y,fisheye_t &feye)
 {
-    double  w = Img.cols;
-    double  h = Img.rows;
+    Point local_orig = Point(feye.center.x-feye.r,feye.center.y-feye.r);
+    cout<<"local orig(x,y)=" << local_orig.x<<" "<<local_orig.y<<endl;
+    int clip_l = max(local_orig.x,0);
+    int clip_r = min(local_orig.x+feye.r*2,Img.cols);
+    int clip_t = max(local_orig.y,0);
+    int clip_d = min(local_orig.y+feye.r*2,Img.rows);
+    bool is_legal = true;
+    cout<<"l:"<<clip_l<<"r:"<<clip_r<<"t:"<<clip_t<<"d:"<<clip_d<<endl;
     for (int  y = 0; y <Img.rows ; y++)
     {
         // normalize y coordinate to -1 ... 1
-        double ny = ((2*y)/h)-1;
-        // pre calculate ny*ny
+        //double ny = (2*(y-local_orig.y)/w)-1;
+        double ny =  (y-feye.center.y)/(double)feye.r;
+
         double ny2 = ny*ny;
         for (int  x = 0 ; x <Img.cols ; x++)
         {
-            // normalize x coordinate to -1 ... 1
-            double nx = ((2*x)/w)-1;
-            // pre calculate nx*nx
+            // x coordinate to -1 ... 1
+          //  double nx = (2*(x-local_orig.x)/w)-1;
+            double nx =  (x -feye.center.x)/(double)feye.r;
             double nx2 = nx*nx;
             // calculate distance from center (0,0)
             // this will include circle or ellipse shape portion
@@ -109,7 +81,6 @@ void fisheye_tbl_create(Mat &Img,Mat &map_x,Mat &map_y)
             // discard pixels outside from circle!
             if (0.0<=r&&r<=1.0)
             {
-
                 double nr;
                 //normal spherize
                 //nr = (r + (1.0-sqrt(1.0-r*r))) /2.0;
@@ -120,8 +91,8 @@ void fisheye_tbl_create(Mat &Img,Mat &map_x,Mat &map_y)
                 double a1 = 0.3,b1 =0.7;
                 double tmp = ((-2.0)*a1+sqrt(4.0*a1*a1+4.0*r*(1.0-2.0*a1)))/(2.0-4.0*a1);
                 nr = b1*2*(tmp-tmp*tmp)+tmp*tmp;
-                // discard radius greater than 1.0
-                if (nr<=1.0)
+                // discard radius greater than 1.0 or smaller than 0
+                if (0.0 <= nr)
                 {
                     // calculate the angle for polar coordinates
                     // calculate new x position with new distance in same angle
@@ -129,19 +100,29 @@ void fisheye_tbl_create(Mat &Img,Mat &map_x,Mat &map_y)
                     // calculate new y position with new distance in same angle
                     double nyn = nr*sin(theta);
                     // map from -1 ... 1 to image coordinates
-                    int x2 = (int)(((nxn+1.0)*w)/2.0);
+                    int x2 = (int)(((nxn+1.0)*(double)feye.r)+local_orig.x);
                     // map from -1 ... 1 to image coordinates
-                    int y2 = (int)(((nyn+1.0)*h)/2.0);
+                    int y2 = (int)(((nyn+1.0)*(double)feye.r)+local_orig.y);
                     // Img_out.at<Vec3b>(y,x) = Img.at<Vec3b>(y2,x2);
                     //data.push_back(Point(x2,y2));
-                     map_x.at<int>(y,x) = x2;
-                     map_y.at<int>(y,x) = y2;
+                    //if new coordinate is legal ,than record it new coordinate.
+                    //otherwise it will map to it self
+                    if(0 <= y2 && y2 < Img.rows && 0 <= x2 && x2 < Img.cols)
+                    {
+                        map_x.at<int>(y,x) = x2;
+                        map_y.at<int>(y,x) = y2;
+                    }
+                    else
+                        is_legal = false;
                 }
             }
             else
+                is_legal = false;
+            if(!is_legal)
             {
                 map_x.at<int>(y,x) = x;
                 map_y.at<int>(y,x) = y;
+                is_legal = true;
             }
          }
     }
@@ -154,7 +135,7 @@ int main()
     cap.set(CV_CAP_PROP_FRAME_WIDTH,1280);
     cap.set(CV_CAP_PROP_FRAME_HEIGHT,720);
     Mat Img,frame;
-    frame = imread("fish.jpg");
+    frame = imread("fish3.jpg");
     if(!frame.data)
     {
         cout<<"fail to open image";
@@ -166,9 +147,6 @@ int main()
     feye.center.x = Img.cols/2;  //640
     feye.center.y = Img.rows/2;  //360
     feye.r = 600;
-    fisheye_boarder(frame,Img,feye);
-    imshow("boarder",Img);
-    waitKey();
     Point clip_orig(0,0);
     int clip_w = 1280;
     int clip_h = 720;
@@ -182,31 +160,28 @@ int main()
         cout << "invalid clip window: except clip_h+clip_orig.y < frame.rows:"<<frame.rows<<"\n";
         return 0;
     }
-    fisheye_clip(Img,clip_orig,feye);
-
-    imshow("after clip",Img);
-    waitKey();
-
     Mat map_x =Mat(Img.rows,Img.cols,CV_32FC1),
         map_y =Mat(Img.rows,Img.cols,CV_32FC1);
     //now Img is a square image
     //square table will be created and mapped back to src image coordinate
-    fisheye_tbl_create(Img,map_x,map_y);
-
+    fisheye_tbl_create(Img,map_x,map_y,feye);
     Mat Img_out = Mat(clip_h,clip_w,CV_8UC1);
     uchar *src_ptr;
     uchar *dst_ptr;
 // for(;;)
- //   {
- //       cap>>frame;
+//    {
+//        cap>>frame;
 //      cvtColor(frame, frame, CV_BGR2GRAY);
+//      imshow("src_Img",Img);
+//      imshow("cap_Img",frame);
+ //     waitKey();
  //       Img = frame;
         //scan over Img_out by ptr++ since Img_out is continuous;
         //src image is in fish eye  space
         dst_ptr = Img_out.ptr<uchar>(0);
-        for (int  j =clip_orig.y-feye.orig.y; j <clip_orig.y-feye.orig.y + clip_h; j++)
+        for (int  j =clip_orig.y; j <clip_orig.y + clip_h; j++)
         {
-            for (int  i = clip_orig.x-feye.orig.x; i <clip_orig.x-feye.orig.x + clip_w; i++)
+            for (int  i = clip_orig.x; i <clip_orig.x + clip_w; i++)
             {
              //   cout<<"x"<<map_x.at<int>(j,i)<<"y"<<map_x.at<int>(j,i)<<"\n";
                 src_ptr = Img.ptr<uchar>(map_y.at<int>(j,i));
@@ -215,9 +190,9 @@ int main()
         }
         imshow("de-fisheye",Img_out);
         waitKey();
- //       if(waitKey(30)>=0)
- //           break;
- //   }
+//        if(waitKey(30)>=0)
+//            break;
+//    }
 //    for (int  y = center.y - delta_y; y <  center.y + delta_y; y++)
 //    {
 //        for (int  x = center.x - delta_x; x <  center.x + delta_x; x++)
