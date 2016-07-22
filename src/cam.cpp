@@ -1,5 +1,3 @@
-//Press u to update subtract image
-//Press e to exit
 #include <opencv2/objdetect/objdetect.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -13,61 +11,73 @@
 
 using namespace std;
 using namespace cv;
-
+#define MIN_WIDTH 4
+#define KEY 25
+int threshold_value = 58;
+int threshold_type = 0;
+int const max_value = 255;
+int const max_type = 4;
+int const max_BINARY_value = 255;
 int main(int argc, const char** argv)
 {
-    VideoCapture cap(0);
-    cap.set(CV_CAP_PROP_FOURCC ,CV_FOURCC('M', 'J', 'P', 'G') );
-    cap.set(CV_CAP_PROP_FRAME_WIDTH,1920);
-    cap.set(CV_CAP_PROP_FRAME_HEIGHT,1080);
-    Mat frame;
-    for(;;)
-    {
-        cap>>frame;
-        imshow("asdf",frame);
-        if(waitKey(30) >= 0) break;
-    }
-    /*
-    Mat orig,target;
-    Mat *fptr;
-    orig = imread("grid2.png");
-    cvtColor(orig,orig,CV_RGB2GRAY);
-    target = orig.clone();
+    Mat Img;
+    Img = imread("line.jpg");
+    cvtColor(Img ,Img, COLOR_RGB2GRAY);
+    threshold( Img,Img, threshold_value, max_BINARY_value,threshold_type );
 
-    imshow("before", orig);
-    cout<<"addr of orig before" <<&orig<<"\n";
-    cout<<"addr of orig before" <<*orig.ptr<uchar>(0,0)<<"\n";
-    uchar *out;
-    uchar *in;
-    for(int i = 0;i < target.rows;i++)
-    {
-        in = orig.ptr<uchar>(i);
-        out = target.ptr<uchar>(i);
-        for(int j = 0;j < target.cols;j++)
-        {
-            out[j] = in[target.cols -j];
-        }
-    }
-    imshow("target", target);
-    Mat orig2 = imread("sample.png");
-    waitKey();
-    if(!orig2.data)
-    {
-        cout<<"sample.png open failed";
-        return 0;
-    }
-        for(int i = 0;i < target.rows;i++)
-    {
 
-        for(int j = 0;j < target.cols;j++)
+    int key_cnt = 0;
+    int pixel_cnt = 0;
+    bool bw_switch = 0; //  black/white  true/false
+    bool recorded_y[Img.rows] = {false};
+    int bcnt  =0;
+    int wcnt  =0;
+
+    for (int  y = 0; y <Img.rows ; y++)
+    {
+        for (int  x = 0; x <Img.cols ; x++)
         {
-            orig.at<uchar>(i,j) = 0;
+            if((int)Img.at<uchar>(y,x)==0)
+            {
+                wcnt++;
+                if(bw_switch == true)
+                {
+                    pixel_cnt = 0;
+                    bw_switch = false;
+                }
+            }
+            else
+            {
+                bcnt++;
+                if(bw_switch == false)
+                {
+                    pixel_cnt = 0;
+                    bw_switch = true;
+                }
+            }
+            pixel_cnt++;
+            if(pixel_cnt==4)
+            {
+                key_cnt++;
+            }
+
         }
+         //    cout<<key_cnt<<" ";
+        if(key_cnt == KEY)
+        {
+            recorded_y[y] = true;
+        }
+        key_cnt = 0;
+        pixel_cnt = 0;
     }
-    cout<<"addr of orig after" <<&orig<<"\n";
-    imshow("target after update", target);
-    imshow("orig after update", orig);
-    */
+
+//cout<<"b"<<bcnt<<"w"<<wcnt;
+    for (int  y = 0; y <Img.rows ; y++)
+    {
+        if( recorded_y[y])
+            cout<<y<<"\t";
+    }
+    imshow("asdf",Img);
     waitKey();
     return 0;
 }
