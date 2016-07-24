@@ -14,6 +14,8 @@ using namespace cv;
 #define MIN_WIDTH 4
 #define KEY 25
 #define CLIP_WIDTH 886
+#define LOWEST_TONE 48
+
 int threshold_value = 120;
 int threshold_type = 0;
 int const max_value = 255;
@@ -25,7 +27,7 @@ struct note_t
     int bend = -1;
 };
 template<typename T, size_t N>
-void record_valid_rows(Mat &Img,T (&recorded_y)[N])
+void record_valid_rows(Mat &Img,T (&valid_y)[N])
 {
     int key_cnt = 0;
     int pixel_cnt = 0;
@@ -59,7 +61,7 @@ void record_valid_rows(Mat &Img,T (&recorded_y)[N])
         }
         if(key_cnt == KEY)
         {
-            recorded_y[y] = true;
+            valid_y[y] = true;
         }
         key_cnt = 0;
         pixel_cnt = 0;
@@ -73,31 +75,45 @@ int main(int argc, const char** argv)
     threshold( Img,Img, threshold_value, max_BINARY_value,threshold_type );
     imshow("thres",Img);
 
-    bool recorded_y[CLIP_WIDTH] = {false};
-    record_valid_rows(Img,recorded_y);
-    note_t note[Img.rows][KEY];
-
-
-
-
-//cout<<"b"<<bcnt<<"w"<<wcnt;
-    cvtColor(Img,Img,COLOR_GRAY2BGR);
+    bool valid_y[CLIP_WIDTH] = {false};
+    record_valid_rows(Img,valid_y);
+    note_t **note = new note_t*[Img.rows];
+    for (int i = 0 ; i < Img.rows ; i++)
+        note[i] = new note_t[Img.cols];
+//    cvtColor(Img,Img,COLOR_GRAY2BGR);
 
     for (int  y = 0; y <Img.rows ; y++)
     {
-        if(recorded_y[y])
+        if(valid_y[y])
         {
-            for (int  x = 0; x <Img.cols ; x++)
+            int current_tone = LOWEST_TONE;
+            bool bw_switch = (bool)Img.at<uchar>(y,0);
+            int cnt=0;
+            for (int  x = 1; x <Img.cols ; x++)
             {
 
-                Img.at<Vec3b>(Point(x, y))[0] = 0;
-                Img.at<Vec3b>(Point(x, y))[1] = 0;
-                Img.at<Vec3b>(Point(x, y))[2] = 255;
+                bool current_pixel = (bool)Img.at<uchar>(y,x);
+                cnt++;
+                if(current_pixel != bw_switch || x == Img.cols-1)
+                {
+                    bw_switch = current_pixel;
+                    double key_width = (double)cnt;
+                    while(cnt!=0)
+                   {
+                       note[y][x-cnt].tone = current_tone;
+                       //48~80
+                       note[y][x-cnt].bend = (int)(48+32.0*(1.0-(double)cnt/key_width));
+                       cnt--;
+                   }
+                   current_tone ++;
+                }
             }
-
         }
     }
-
+    for (int  x = 1; x <Img.cols ; x++)
+    {
+        cout<<note[12][x].bend<<"\t";
+    }
     imshow("asdf",Img);
     waitKey();
     return 0;
