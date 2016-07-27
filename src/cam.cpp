@@ -14,6 +14,7 @@ using namespace cv;
 #define MIN_WIDTH 4
 #define KEY 25
 #define CLIP_WIDTH 886
+#define BEND_RANGE 12
 #define LOWEST_TONE 48
 
 int threshold_value = 120;
@@ -82,6 +83,7 @@ int main(int argc, const char** argv)
         note[i] = new note_t[Img.cols];
 //    cvtColor(Img,Img,COLOR_GRAY2BGR);
 
+    const float bpk = 64.0/BEND_RANGE;
     for (int  y = 0; y <Img.rows ; y++)
     {
         if(valid_y[y])
@@ -89,6 +91,7 @@ int main(int argc, const char** argv)
             int current_tone = LOWEST_TONE;
             bool bw_switch = (bool)Img.at<uchar>(y,0);
             int cnt=0;
+            float current_bend = 0;
             for (int  x = 1; x <Img.cols ; x++)
             {
 
@@ -98,13 +101,14 @@ int main(int argc, const char** argv)
                 {
                     bw_switch = current_pixel;
                     double key_width = (double)cnt;
-                    while(cnt!=0)
+                    while(cnt != -1 )
                    {
                        note[y][x-cnt].tone = current_tone;
                        //48~80
-                       note[y][x-cnt].bend = (int)(48+32.0*(1.0-(double)cnt/key_width));
+                       note[y][x-cnt].bend =(int)(current_bend+bpk*(1.0-(double)cnt/key_width));
                        cnt--;
                    }
+                   current_bend += bpk;
                    current_tone ++;
                 }
             }
